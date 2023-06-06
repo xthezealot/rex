@@ -3,10 +3,12 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"io"
 	"log"
 	"net"
 	"os"
 	"os/exec"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -122,7 +124,7 @@ func main() {
 
 	// find subdomains
 	if len(domainsToSubfind) > 0 {
-		log.Println("started subdomains search")
+		log.Println("subdomain search started")
 		cmd := exec.Command("subfinder", "-all", "-active", "-silent")
 		cmd.Stdin = strings.NewReader(strings.Join(domainsToSubfind, "\n"))
 		if b, err = cmd.Output(); err != nil {
@@ -147,7 +149,7 @@ func main() {
 	// scan targets
 	var wg sync.WaitGroup
 	for host, target := range hunt.Targets {
-		// do not overwrite old ports
+		// do not overwrite old target
 		if len(target.Ports) > 0 {
 			continue
 		}
@@ -166,23 +168,13 @@ func main() {
 
 			// scan common ports
 			target.Ports = make(map[int]Port)
-			for cp, name := range commonPorts {
-				t := time.Now()
-				conn, err := net.DialTimeout("tcp", host+":"+strconv.Itoa(cp), time.Second)
-				log.Printf("checked port %d (%s) on %s in %dms", cp, name, host, time.Since(t).Milliseconds())
+			for port, name := range commonPorts {
+				p, err := portInfo(host, port)
 				if err != nil {
 					continue
 				}
-				conn.Close()
-
-				// todo: http/html request when needed
-
-				log.Printf("port %d (%s) is open on %s", cp, name, host)
-
-				// save port
-				target.Ports[cp] = Port{
-					Version: name,
-				}
+				target.Ports[port] = p
+				log.Printf("port %d (%s) is open on %s", port, name, host)
 			}
 
 			// save target
@@ -201,4 +193,35 @@ func main() {
 		panic(err)
 	}
 	log.Printf("hunt saved in %s", filename)
+}
+
+func portInfo(host string, port int) (Port, error) {
+	p := Port{Version: commonPorts[port]}
+
+	conn, err := net.DialTimeout("tcp", host+":"+strconv.Itoa(port), time.Second)
+	if err != nil {
+		return p, err
+	}
+	defer conn.Close()
+
+	conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	b, _ := io.ReadAll(conn)
+
+	var ver string
+	switch port {
+	case 3306:
+		re, err := regexp.Compile(`(?m)^[0-9a-zA-Z-_+.]{3,}`)
+		if err != nil {
+			break
+		}
+		ver = string(re.Find(b))
+	}
+
+	if ver != "" {
+		p.Version += " (" + ver + ")"
+	}
+
+	// todo: http/html request when needed
+
+	return p, err
 }
