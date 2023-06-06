@@ -3,9 +3,11 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"io"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"regexp"
@@ -14,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/net/html"
 	"gopkg.in/yaml.v3"
 )
 
@@ -45,27 +48,36 @@ var commonPorts = map[int]string{
 	27017: "mongodb",
 }
 
+var pathsWordlist = map[string]struct{}{
+	"":        {},
+	".env":    {},
+	"contact": {},
+}
+
 type Hunt struct {
 	Scope   []string          `yaml:"scope"`
-	Targets map[string]Target `yaml:",omitempty"`
+	Targets map[string]Target `yaml:",omitempty"` // map of host to target info
 	mu      sync.Mutex
 }
 
 type Target struct {
-	Ports map[int]Port `yaml:",omitempty"`
+	Ports map[int]Port `yaml:",omitempty"` // map of port number to port info
 }
 
 type Port struct {
 	Version string
-	HTTP    HTTP `yaml:",omitempty"`
+	HTTP    map[string]HTTPResponse `yaml:",omitempty"` // map of paths to http response
 }
 
-type HTTP struct {
+type HTTPResponse struct {
 	ContentType string
 	Title       string
 }
 
 func main() {
+	fmt.Println(portInfo("62.210.115.117", 21))
+	os.Exit(0)
+
 	hunt := &Hunt{}
 
 	b, err := os.ReadFile(filename)
@@ -196,7 +208,9 @@ func main() {
 }
 
 func portInfo(host string, port int) (Port, error) {
-	p := Port{Version: commonPorts[port]}
+	p := Port{
+		Version: commonPorts[port],
+	}
 
 	conn, err := net.DialTimeout("tcp", host+":"+strconv.Itoa(port), time.Second)
 	if err != nil {
@@ -207,21 +221,79 @@ func portInfo(host string, port int) (Port, error) {
 	conn.SetReadDeadline(time.Now().Add(2 * time.Second))
 	b, _ := io.ReadAll(conn)
 
+	// parse service version
 	var ver string
 	switch port {
+
+	// common http ports
+	case 80, 443, 3000, 5000, 8000, 8008, 8080, 8081, 8443, 8888:
+		p.HTTP = make(map[string]HTTPResponse)
+
+		scheme := "http"
+		if port == 443 {
+			scheme += "s"
+		}
+
+		// bruteforce paths
+		for path, _ := range pathsWordlist {
+			// todo: make http response
+
+			res, err := http.Get(scheme + "://" + host + ":" + strconv.Itoa(port) + "/" + path)
+			if err != nil {
+				break
+			}
+			defer res.Body.Close()
+
+			doc, err := html.Parse(res.Body)
+			if err != nil {
+				break
+			}
+			var crawler func(*html.Node)
+			crawler = func(n *html.Node) {
+				if n.Type == html.ElementNode && n.Data == "title" {
+					if n.FirstChild != nil {
+						p.HTTP.Title = n.FirstChild.Data // todo
+					}
+				}
+				for c := n.FirstChild; c != nil; c = c.NextSibling {
+					crawler(c)
+				}
+			}
+			crawler(doc)
+
+			// todo: save response if final path (after redirects) is not known
+		}
+
+	case 21:
+		lines := strings.SplitN(string(b), "\n", 2)
+		line := lines[0]
+		if len(line) >= 3 {
+			ver = strings.TrimSpace(line[3:])
+		}
+
+	case 22:
+		re, err := regexp.Compile(`(?im)^.*ssh.*$`)
+		if err != nil {
+			break
+		}
+		ver = strings.TrimSpace(string(re.Find(b)))
+
+	// todo: 445 (smb): look at smbclient and enum4linux
+
+	// todo: 1433 (mssql): see https://svn.nmap.org/nmap/scripts/ms-sql-ntlm-info.nse
+
 	case 3306:
 		re, err := regexp.Compile(`(?m)^[0-9a-zA-Z-_+.]{3,}`)
 		if err != nil {
 			break
 		}
-		ver = string(re.Find(b))
+		ver = strings.TrimSpace(string(re.Find(b)))
+
 	}
 
 	if ver != "" {
 		p.Version += " (" + ver + ")"
 	}
-
-	// todo: http/html request when needed
 
 	return p, err
 }
