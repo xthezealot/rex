@@ -189,6 +189,8 @@ func main() {
 				log.Printf("port %d (%s) is open on %s", port, name, host)
 			}
 
+			// todo: nuceli scan
+
 			// save target
 			hunt.mu.Lock()
 			defer hunt.mu.Unlock()
@@ -236,7 +238,7 @@ func portInfo(host string, port int) (Port, error) {
 
 		// bruteforce paths
 		for path, _ := range pathsWordlist {
-			// todo: make http response
+			var hr HTTPResponse
 
 			res, err := http.Get(scheme + "://" + host + ":" + strconv.Itoa(port) + "/" + path)
 			if err != nil {
@@ -244,24 +246,47 @@ func portInfo(host string, port int) (Port, error) {
 			}
 			defer res.Body.Close()
 
-			doc, err := html.Parse(res.Body)
-			if err != nil {
-				break
+			// todo: store body to file
+
+			finalPath := res.Request.URL.Path
+
+			// ignore this path if final path (after redirects) already known
+			if _, ok := p.HTTP[finalPath]; ok {
+				continue
 			}
-			var crawler func(*html.Node)
-			crawler = func(n *html.Node) {
-				if n.Type == html.ElementNode && n.Data == "title" {
-					if n.FirstChild != nil {
-						p.HTTP.Title = n.FirstChild.Data // todo
+
+			// get content type
+			hr.ContentType = res.Header.Get("content-type")
+
+			// todo: reject path if it's not text, html, json, xml or similar
+
+			// get server info
+			ver = res.Header.Get("server")
+			if ver == "" {
+				ver = res.Header.Get("x-server")
+			}
+
+			// get html tilte
+			doc, err := html.Parse(res.Body)
+			if err == nil {
+				var crawler func(*html.Node)
+				crawler = func(n *html.Node) {
+					if n.Type == html.ElementNode && n.Data == "title" {
+						if n.FirstChild != nil {
+							hr.Title = n.FirstChild.Data
+						}
+					}
+					for c := n.FirstChild; c != nil; c = c.NextSibling {
+						crawler(c)
 					}
 				}
-				for c := n.FirstChild; c != nil; c = c.NextSibling {
-					crawler(c)
-				}
+				crawler(doc)
 			}
-			crawler(doc)
 
-			// todo: save response if final path (after redirects) is not known
+			// todo: nuclei scan with tech detect
+
+			// save response
+			p.HTTP[finalPath] = hr
 		}
 
 	case 21:
