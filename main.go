@@ -3,13 +3,14 @@ package main
 import (
 	"bufio"
 	"bytes"
-	"fmt"
 	"io"
 	"log"
+	"mime"
 	"net"
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -21,6 +22,8 @@ import (
 )
 
 const filename = "hunt.yml"
+
+var currentDir string
 
 var commonPorts = map[int]string{
 	80:   "http",
@@ -54,6 +57,19 @@ var pathsWordlist = map[string]struct{}{
 	"contact": {},
 }
 
+var goodStatusCodes = map[int]struct{}{
+	200: {},
+	201: {},
+	202: {},
+	204: {},
+	205: {},
+	206: {},
+	302: {},
+	304: {},
+	401: {},
+	403: {},
+}
+
 type Hunt struct {
 	Scope   []string          `yaml:"scope"`
 	Targets map[string]Target `yaml:",omitempty"` // map of host to target info
@@ -70,13 +86,22 @@ type Port struct {
 }
 
 type HTTPResponse struct {
+	Status      int
 	ContentType string
 	Title       string
 }
 
+func init() {
+	var err error
+	currentDir, err = os.Getwd()
+	if err != nil {
+		panic(err)
+	}
+}
+
 func main() {
-	fmt.Println(portInfo("62.210.115.117", 21))
-	os.Exit(0)
+	// fmt.Println(portInfo("alefunion.com", 80))
+	// os.Exit(0)
 
 	hunt := &Hunt{}
 
@@ -220,9 +245,6 @@ func portInfo(host string, port int) (Port, error) {
 	}
 	defer conn.Close()
 
-	conn.SetReadDeadline(time.Now().Add(2 * time.Second))
-	b, _ := io.ReadAll(conn)
-
 	// parse service version
 	var ver string
 	switch port {
@@ -237,7 +259,7 @@ func portInfo(host string, port int) (Port, error) {
 		}
 
 		// bruteforce paths
-		for path, _ := range pathsWordlist {
+		for path := range pathsWordlist {
 			var hr HTTPResponse
 
 			res, err := http.Get(scheme + "://" + host + ":" + strconv.Itoa(port) + "/" + path)
@@ -246,7 +268,16 @@ func portInfo(host string, port int) (Port, error) {
 			}
 			defer res.Body.Close()
 
-			// todo: store body to file
+			// filter status codes
+			if res.StatusCode == 429 {
+				log.Printf("too many requests (status 429) on %s", host)
+				break
+			}
+			if _, ok := goodStatusCodes[res.StatusCode]; !ok {
+				continue
+			}
+
+			hr.Status = res.StatusCode
 
 			finalPath := res.Request.URL.Path
 
@@ -255,8 +286,10 @@ func portInfo(host string, port int) (Port, error) {
 				continue
 			}
 
+			// todo: store body to file
+
 			// get content type
-			hr.ContentType = res.Header.Get("content-type")
+			hr.ContentType, _, _ = mime.ParseMediaType(res.Header.Get("content-type"))
 
 			// todo: reject path if it's not text, html, json, xml or similar
 
@@ -283,6 +316,25 @@ func portInfo(host string, port int) (Port, error) {
 				crawler(doc)
 			}
 
+			// store response
+			// fixme: base file 80.htm, 443.html, ...
+			storagePath := filepath.Join(currentDir, "http", host, strconv.Itoa(port), res.Request.URL.Path)
+			storagePathDir := filepath.Dir(storagePath)
+			os.MkdirAll(storagePathDir, 0755)
+
+			ext, _ := mime.ExtensionsByType(hr.ContentType)
+			if len(ext) >= 1 {
+				if !strings.HasSuffix(storagePath, ext[0]) {
+					storagePath += ext[0]
+				}
+			}
+
+			storageFile, _ := os.Create(storagePath)
+			defer storageFile.Close()
+
+			// fixme: fix res.Body is read a second time so file is empty
+			io.Copy(storageFile, res.Body)
+
 			// todo: nuclei scan with tech detect
 
 			// save response
@@ -290,6 +342,8 @@ func portInfo(host string, port int) (Port, error) {
 		}
 
 	case 21:
+		conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+		b, _ := io.ReadAll(conn)
 		lines := strings.SplitN(string(b), "\n", 2)
 		line := lines[0]
 		if len(line) >= 3 {
@@ -297,6 +351,8 @@ func portInfo(host string, port int) (Port, error) {
 		}
 
 	case 22:
+		conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+		b, _ := io.ReadAll(conn)
 		re, err := regexp.Compile(`(?im)^.*ssh.*$`)
 		if err != nil {
 			break
@@ -308,6 +364,8 @@ func portInfo(host string, port int) (Port, error) {
 	// todo: 1433 (mssql): see https://svn.nmap.org/nmap/scripts/ms-sql-ntlm-info.nse
 
 	case 3306:
+		conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+		b, _ := io.ReadAll(conn)
 		re, err := regexp.Compile(`(?m)^[0-9a-zA-Z-_+.]{3,}`)
 		if err != nil {
 			break
