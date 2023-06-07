@@ -27,17 +27,6 @@ type Target struct {
 	Ports map[int]Port `yaml:",omitempty"` // map of port number to port info
 }
 
-type Port struct {
-	Version string
-	HTTP    map[string]HTTPResponse `yaml:",omitempty"` // map of paths to http response
-}
-
-type HTTPResponse struct {
-	Status      int
-	ContentType string
-	Title       string
-}
-
 func init() {
 	var err error
 	currentDir, err = os.Getwd()
@@ -173,7 +162,7 @@ func main() {
 				target.Ports[port] = p
 			}
 
-			// todo: nuceli scan
+			// todo: nuclei generic scan
 
 			// save target
 			hunt.mu.Lock()

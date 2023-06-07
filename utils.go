@@ -3,9 +3,16 @@ package main
 import (
 	"encoding/binary"
 	"net"
+	"net/http"
 	"net/url"
 	"strings"
 )
+
+var httpClient = &http.Client{
+	CheckRedirect: func(req *http.Request, via []*http.Request) error {
+		return http.ErrUseLastResponse
+	},
+}
 
 // extractHosts returns host addresses (domains or IPs) parsed from s, which can be a domain, an IP, an URL or a CIDR.
 func extractHosts(s string) (hosts []string) {

@@ -1,7 +1,9 @@
 package main
 
 var pathsWordlist = map[string]struct{}{
-	"/":       {},
-	".env":    {},
-	"contact": {},
+	"":          {},
+	".env":      {},
+	"contact":   {},
+	"dashboard": {},
+	"login":     {},
 }
