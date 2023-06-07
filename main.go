@@ -64,10 +64,12 @@ var goodStatusCodes = map[int]struct{}{
 	204: {},
 	205: {},
 	206: {},
-	302: {},
 	304: {},
 	401: {},
+	402: {},
 	403: {},
+	405: {},
+	406: {},
 }
 
 type Hunt struct {
@@ -281,12 +283,10 @@ func portInfo(host string, port int) (Port, error) {
 
 			finalPath := res.Request.URL.Path
 
-			// ignore this path if final path (after redirects) already known
+			// ignore this path if final path (after redirects) is already known on this port
 			if _, ok := p.HTTP[finalPath]; ok {
 				continue
 			}
-
-			// todo: store body to file
 
 			// get content type
 			hr.ContentType, _, _ = mime.ParseMediaType(res.Header.Get("content-type"))
@@ -299,41 +299,48 @@ func portInfo(host string, port int) (Port, error) {
 				ver = res.Header.Get("x-server")
 			}
 
-			// get html tilte
-			doc, err := html.Parse(res.Body)
-			if err == nil {
-				var crawler func(*html.Node)
-				crawler = func(n *html.Node) {
-					if n.Type == html.ElementNode && n.Data == "title" {
-						if n.FirstChild != nil {
-							hr.Title = n.FirstChild.Data
-						}
-					}
-					for c := n.FirstChild; c != nil; c = c.NextSibling {
-						crawler(c)
-					}
-				}
-				crawler(doc)
-			}
-
 			// store response
-			// fixme: base file 80.htm, 443.html, ...
-			storagePath := filepath.Join(currentDir, "http", host, strconv.Itoa(port), res.Request.URL.Path)
-			storagePathDir := filepath.Dir(storagePath)
-			os.MkdirAll(storagePathDir, 0755)
-
-			ext, _ := mime.ExtensionsByType(hr.ContentType)
-			if len(ext) >= 1 {
-				if !strings.HasSuffix(storagePath, ext[0]) {
-					storagePath += ext[0]
-				}
+			urlPathForStorage := filepath.Clean(res.Request.URL.Path)
+			if urlPathForStorage == "." || urlPathForStorage == "/" {
+				urlPathForStorage = "/index"
+			}
+			storagePath := filepath.Join(currentDir, "http", host, strconv.Itoa(port), urlPathForStorage)
+			storageDirpath := filepath.Dir(storagePath)
+			if err = os.MkdirAll(storageDirpath, 0755); err != nil {
+				log.Printf("error creating dir %s: %v", storageDirpath, err)
 			}
 
 			storageFile, _ := os.Create(storagePath)
+			if err != nil {
+				log.Printf("error creating file %s: %v", storagePath, err)
+			}
 			defer storageFile.Close()
 
-			// fixme: fix res.Body is read a second time so file is empty
-			io.Copy(storageFile, res.Body)
+			if _, err = io.Copy(storageFile, res.Body); err != nil {
+				log.Printf("error writing body to file %s: %v", storagePath, err)
+			}
+
+			// if html, get title
+			if hr.ContentType == "text/html" {
+				storageFile.Seek(0, 0) // reset file reader
+				doc, err := html.Parse(storageFile)
+				if err == nil {
+					var crawler func(*html.Node)
+					crawler = func(n *html.Node) {
+						if n.Type == html.ElementNode && n.Data == "title" {
+							if n.FirstChild != nil {
+								hr.Title = n.FirstChild.Data
+							}
+						}
+						for c := n.FirstChild; c != nil; c = c.NextSibling {
+							crawler(c)
+						}
+					}
+					crawler(doc)
+				} else {
+					log.Printf("error parsing html on %s/%s: %v", host, path, err)
+				}
+			}
 
 			// todo: nuclei scan with tech detect
 
