@@ -127,16 +127,16 @@ func portInfo(host string, port int) (Port, error) {
 
 		// bruteforce paths
 		for path := range pathsWordlist {
-			path = filepath.Join("/", path)
+			path = filepath.Join("/", path) // todo: another solution than join, to keep "../" from wordlist
 			var hr HTTPResponse
 
-			res, err := httpClient.Get(hosturl + path)
+			res, err := httpClient.Get(hosturl + path) // todo: use real user-agent header, based on a 10+ list
 			if err != nil {
 				break
 			}
 			defer res.Body.Close()
 
-			// filter status codes
+			// get and filter status codes
 			hr.Status = res.StatusCode
 			if hr.Status == 429 {
 				log.Printf("too many requests (status 429) on %s:%d", host, port)
@@ -146,9 +146,9 @@ func portInfo(host string, port int) (Port, error) {
 				continue
 			}
 
-			// get content type
+			// get and filter content type
 			hr.ContentType, _, _ = mime.ParseMediaType(res.Header.Get("content-type"))
-			if _, ok := interestingContentTypes[hr.ContentType]; !ok {
+			if _, ok := interestingContentTypes[hr.ContentType]; hr.ContentType != "" && !ok {
 				continue
 			}
 
@@ -165,7 +165,7 @@ func portInfo(host string, port int) (Port, error) {
 
 			// if interesting content type, store response
 			if _, ok := downloadableContentTypes[hr.ContentType]; ok {
-				storageURLPath := path
+				storageURLPath := path // todo: after allowing "../" in request path, be careful to not use "../" as storage path
 				if storageURLPath == "/" {
 					storageURLPath = "/index"
 				}
