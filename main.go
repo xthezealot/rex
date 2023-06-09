@@ -132,6 +132,8 @@ func main() {
 		}
 	}
 
+	// todo: save hunt
+
 	// scan targets
 	var wg sync.WaitGroup
 	for host, target := range hunt.Targets {
