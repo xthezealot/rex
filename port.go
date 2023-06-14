@@ -127,18 +127,20 @@ func portInfo(host string, port int) (Port, error) {
 
 		// bruteforce paths
 		for path := range pathsWordlist {
-			path = filepath.Join("/", path) // todo: another solution than join, to keep "../" from wordlist
+			path = filepath.Join("/", path) // todo: another solution than join, to not clean path and keep special parts like "../" from wordlist
 			var hr HTTPResponse
 
-			res, err := httpClient.Get(hosturl + path) // todo: use real user-agent header, based on a 10+ list
+			res, err := httpClient.Get(hosturl + path) // todo: follow redirects ; use real user-agent (based on a 10+ list)
 			if err != nil {
 				break
 			}
 			defer res.Body.Close()
 
+			// todo: after redirection, skip if path is already known in p.HTTP
+
 			// get and filter status codes
 			hr.Status = res.StatusCode
-			if hr.Status == 429 {
+			if hr.Status == 429 { // todo: after redirections, skip if status is 3xx or 404
 				log.Printf("too many requests (status 429) on %s:%d", host, port)
 				break
 			}
@@ -165,7 +167,7 @@ func portInfo(host string, port int) (Port, error) {
 
 			// if interesting content type, store response
 			if _, ok := downloadableContentTypes[hr.ContentType]; ok {
-				storageURLPath := path // todo: after allowing "../" in request path, be careful to not use "../" as storage path
+				storageURLPath := path // todo: use final path after redirections ; be careful to not use "../" as storage path
 				if storageURLPath == "/" {
 					storageURLPath = "/index"
 				}
