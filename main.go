@@ -3,7 +3,9 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"log"
+	"math/rand"
 	"net"
 	"os"
 	"os/exec"
@@ -50,7 +52,8 @@ func init() {
 
 func main() {
 	// fmt.Println(portInfo("alefunion.com", 80))
-	// os.Exit(0)
+	fmt.Println(rand.Intn(10))
+	os.Exit(0)
 
 	hunt := &Hunt{}
 

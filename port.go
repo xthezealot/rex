@@ -3,8 +3,10 @@ package main
 import (
 	"io"
 	"log"
+	"math/rand"
 	"mime"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -38,21 +40,6 @@ var commonPorts = map[int]string{
 	9200:  "elasticsearch",
 	10250: "kubernetes",
 	27017: "mongodb",
-}
-
-var interestingStatuses = map[int]struct{}{
-	200: {},
-	201: {},
-	202: {},
-	204: {},
-	205: {},
-	206: {},
-	304: {},
-	401: {},
-	402: {},
-	403: {},
-	405: {},
-	406: {},
 }
 
 var interestingContentTypes = map[string]struct{}{
@@ -126,25 +113,37 @@ func portInfo(host string, port int) (Port, error) {
 		hosturl += "://" + host + ":" + strconv.Itoa(port)
 
 		// bruteforce paths
-		for path := range pathsWordlist {
-			path = filepath.Join("/", path) // todo: another solution than join, to not clean path and keep special parts like "../" from wordlist
+		for path := range pathsWordlistSimple {
 			var hr HTTPResponse
 
-			res, err := httpClient.Get(hosturl + path) // todo: follow redirects ; use real user-agent (based on a 10+ list)
+			// prepare request with exact word from list and random user-agent
+			req, err := http.NewRequest("GET", hosturl+"/"+path, nil)
 			if err != nil {
+				log.Println(err)
+				break
+			}
+			req.Header.Set("User-Agent", userAgents[rand.Intn(len(userAgents))])
+
+			// make request (following redirects)
+			res, err := http.DefaultClient.Do(req)
+			if err != nil {
+				log.Println(err)
 				break
 			}
 			defer res.Body.Close()
 
-			// todo: after redirection, skip if path is already known in p.HTTP
-
 			// get and filter status codes
 			hr.Status = res.StatusCode
-			if hr.Status == 429 { // todo: after redirections, skip if status is 3xx or 404
+			if hr.Status == 429 {
 				log.Printf("too many requests (status 429) on %s:%d", host, port)
 				break
 			}
-			if _, ok := interestingStatuses[hr.Status]; !ok {
+			if hr.Status >= 300 && hr.Status <= 399 {
+				continue
+			}
+
+			// skip if final path (after redirects) is already in p.HTTP
+			if _, ok := p.HTTP[res.Request.URL.Path]; ok {
 				continue
 			}
 
@@ -167,22 +166,27 @@ func portInfo(host string, port int) (Port, error) {
 
 			// if interesting content type, store response
 			if _, ok := downloadableContentTypes[hr.ContentType]; ok {
-				storageURLPath := path // todo: use final path after redirections ; be careful to not use "../" as storage path
+				// use final path and be careful to replace ".." in path
+				storageURLPath := strings.ReplaceAll(res.Request.URL.Path, "..", "PARENT")
 				if storageURLPath == "/" {
-					storageURLPath = "/index"
+					storageURLPath = "/0-INDEX"
 				}
+
+				// create dir
 				storagePath := filepath.Join(currentDir, "http", host, strconv.Itoa(port), storageURLPath)
 				storageDirpath := filepath.Dir(storagePath)
 				if err = os.MkdirAll(storageDirpath, 0755); err != nil {
 					log.Printf("error creating dir %s: %v", storageDirpath, err)
 				}
 
+				// create file
 				storageFile, _ := os.Create(storagePath)
 				if err != nil {
 					log.Printf("error creating file %s: %v", storagePath, err)
 				}
 				defer storageFile.Close()
 
+				// save file
 				if _, err = io.Copy(storageFile, res.Body); err != nil {
 					log.Printf("error writing body to file %s: %v", storagePath, err)
 				}
