@@ -119,7 +119,7 @@ func portInfo(host string, port int) (Port, error) {
 			// prepare request with exact word from list and random user-agent
 			req, err := http.NewRequest("GET", hosturl+"/"+path, nil)
 			if err != nil {
-				log.Println(err)
+				log.Printf("get request creation for %s: %v", hosturl+"/"+path, err)
 				break
 			}
 			req.Header.Set("User-Agent", userAgents[rand.Intn(len(userAgents))])
@@ -127,7 +127,7 @@ func portInfo(host string, port int) (Port, error) {
 			// make request (following redirects)
 			res, err := http.DefaultClient.Do(req)
 			if err != nil {
-				log.Println(err)
+				log.Printf("get request to %s: %v", req.URL.String(), err)
 				break
 			}
 			defer res.Body.Close()
@@ -135,15 +135,22 @@ func portInfo(host string, port int) (Port, error) {
 			// get and filter status codes
 			hr.Status = res.StatusCode
 			if hr.Status == 429 {
-				log.Printf("too many requests (status 429) on %s:%d", host, port)
+				log.Printf("too many requests (status 429) on %s", res.Request.URL.Host)
 				break
 			}
-			if hr.Status >= 300 && hr.Status <= 399 {
+			if hr.Status >= 300 && hr.Status <= 399 || hr.Status == 404 {
 				continue
 			}
 
+			// skip if redirected to another domain
+			if res.Request.URL.Hostname() != host {
+				continue
+			}
+
+			finalPath := res.Request.URL.Path
+
 			// skip if final path (after redirects) is already in p.HTTP
-			if _, ok := p.HTTP[res.Request.URL.Path]; ok {
+			if _, ok := p.HTTP[finalPath]; ok {
 				continue
 			}
 
@@ -153,7 +160,7 @@ func portInfo(host string, port int) (Port, error) {
 				continue
 			}
 
-			log.Printf("found %s%s (%d, %q)", hosturl, path, hr.Status, hr.ContentType)
+			log.Printf("found %s (%d, %q)", res.Request.URL.String(), hr.Status, hr.ContentType)
 
 			// get server version info
 			ver := res.Header.Get("server")
@@ -167,9 +174,9 @@ func portInfo(host string, port int) (Port, error) {
 			// if interesting content type, store response
 			if _, ok := downloadableContentTypes[hr.ContentType]; ok {
 				// use final path and be careful to replace ".." in path
-				storageURLPath := strings.ReplaceAll(res.Request.URL.Path, "..", "PARENT")
+				storageURLPath := strings.ReplaceAll(finalPath, "..", "PARENT")
 				if storageURLPath == "/" {
-					storageURLPath = "/0-INDEX"
+					storageURLPath = "/INDEX"
 				}
 
 				// create dir
@@ -217,7 +224,7 @@ func portInfo(host string, port int) (Port, error) {
 			// todo: nuclei tech-adapted scan
 
 			// save response
-			p.HTTP[path] = hr
+			p.HTTP[finalPath] = hr
 		}
 
 	// ftp
