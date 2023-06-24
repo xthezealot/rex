@@ -113,7 +113,7 @@ func portInfo(host string, port int) (Port, error) {
 		hosturl += "://" + host + ":" + strconv.Itoa(port)
 
 		// bruteforce paths
-		for path := range pathsWordlistSimple {
+		for path := range pathsWordlist {
 			var hr HTTPResponse
 
 			// prepare request with exact word from list and random user-agent
