@@ -219,6 +219,10 @@ func portInfo(host string, port int) (Port, error) {
 						log.Printf("error parsing html on %s%s: %v", host, path, err)
 					}
 				}
+
+				// todo: if path is /robots.txt, parse file content and add paths to loop
+
+				// todo: read file and try to find secrets
 			}
 
 			// todo: nuclei tech-adapted scan

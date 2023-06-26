@@ -33,19 +33,6 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-
-	// get wordlist in memory
-	// f, err := os.Open("wordlist.txt")
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// sc := bufio.NewScanner(f)
-	// for sc.Scan() {
-	// 	pathsWordlist[sc.Text()] = struct{}{}
-	// }
-	// if err := sc.Err(); err != nil {
-	// 	log.Fatal(err)
-	// }
 }
 
 func main() {
