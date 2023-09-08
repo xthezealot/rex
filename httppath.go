@@ -3,12 +3,14 @@ package main
 import (
 	"errors"
 	"fmt"
+	"log"
 	"math/rand"
 	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"golang.org/x/net/html"
 )
@@ -77,7 +79,7 @@ func (hp *HTTPPath) Hunt() error {
 	req.Header.Set("User-Agent", userAgents[rand.Intn(len(userAgents))]) // use random user-agent
 
 	// make request (following redirects)
-	res, err := http.DefaultClient.Do(req)
+	res, err := httpclient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -136,13 +138,17 @@ func (hp *HTTPPath) Hunt() error {
 		storagePath := filepath.Join(currentDir, "http", hp.Port.Target.Host, strconv.Itoa(hp.Port.Number), sanitizeFilepath(hp.Path), "index.http")
 		storageDirpath := filepath.Dir(storagePath)
 		if err = os.MkdirAll(storageDirpath, 0755); err != nil {
-			return fmt.Errorf("error creating dir %s: %v", storageDirpath, err)
+			if *flagVerbose {
+				log.Printf("error creating dir %s: %v", storageDirpath, err)
+			}
 		}
 
 		// create file
 		storageFile, _ := os.Create(storagePath)
 		if err != nil {
-			return fmt.Errorf("error creating file %s: %v", storagePath, err)
+			if *flagVerbose {
+				log.Printf("error creating file %s: %v", storagePath, err)
+			}
 		}
 		defer storageFile.Close()
 
@@ -174,8 +180,15 @@ func (hp *HTTPPath) Hunt() error {
 				}
 				crawler(doc)
 			} else {
-				return fmt.Errorf("error parsing html on %s: %v", url, err)
+				if *flagVerbose {
+					log.Printf("error parsing html on %s: %v", url, err)
+				}
 			}
+		}
+
+		// ditch waf pages
+		if strings.Contains(hp.Title, "Cloudflare") {
+			return errIrrelevantPath
 		}
 
 		// todo: search for secrets in response body

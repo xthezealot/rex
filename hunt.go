@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"sync"
@@ -31,6 +32,20 @@ func (hunt *Hunt) Save() error {
 	return os.WriteFile(filename, b, 0644)
 }
 
+// AddTarget tries to add a new target which is not already known.
+// If it has been added, it returns true.
+func (hunt *Hunt) AddTarget(target *Target) bool {
+	hunt.mu.Lock()
+	defer hunt.mu.Unlock()
+
+	if _, ok := hunt.Targets[target.Host]; ok {
+		return false
+	}
+
+	hunt.Targets[target.Host] = target
+	return true
+}
+
 func (hunt *Hunt) Go() {
 	if hunt.Targets == nil {
 		hunt.Targets = make(map[string]*Target)
@@ -39,17 +54,15 @@ func (hunt *Hunt) Go() {
 	for _, s := range hunt.Scope {
 		hosts := extractHosts(s)
 		for _, host := range hosts {
-			hunt.mu.Lock()
-			if _, ok := hunt.Targets[host]; ok {
-				hunt.mu.Unlock()
-				continue // do not overwrite old targets
+			target := &Target{
+				Host: host,
+				hunt: hunt,
 			}
-			hunt.mu.Unlock()
 
-			target := &Target{Host: host}
-			hunt.mu.Lock()
-			hunt.Targets[target.Host] = target
-			hunt.mu.Unlock()
+			if !hunt.AddTarget(target) {
+				continue
+			}
+
 			log.Printf("new target: %s", target.Host)
 
 			globalWG.Add(1)
@@ -68,6 +81,21 @@ func (hunt *Hunt) Go() {
 
 					target.HuntSubdomains()
 				}()
+			}
+		}
+	}
+}
+
+func (hunt *Hunt) Print() {
+	for targetHost, target := range hunt.Targets {
+		if len(target.Ports) == 0 {
+			continue
+		}
+		fmt.Printf("%s\n", targetHost)
+		for portNumber, port := range target.Ports {
+			fmt.Printf("\t:%d  %s  %s\n", portNumber, port.Name, port.Version)
+			for _, path := range port.Paths {
+				fmt.Printf("\t\t%s  %d  %s  %s  %s\n", path.Path, path.Status, path.ContentType, path.Tech, path.Title)
 			}
 		}
 	}

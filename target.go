@@ -1,8 +1,11 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"log"
 	"net"
+	"os/exec"
 	"sync"
 )
 
@@ -10,7 +13,8 @@ type Target struct {
 	Host  string        `yaml:"-"`
 	Ports map[int]*Port `yaml:",omitempty"` // map of port number to port info
 
-	mu sync.Mutex
+	hunt *Hunt
+	mu   sync.Mutex
 }
 
 func (target *Target) Hunt() {
@@ -49,11 +53,41 @@ func (target *Target) Hunt() {
 	// todo: nuclei generic scan
 }
 
-func (t *Target) HuntSubdomains() {
-	defer globalWG.Done()
-
-	if isIP(t.Host) {
+func (target *Target) HuntSubdomains() {
+	if isIP(target.Host) {
 		return
+	}
+
+	cmd := exec.Command("subfinder", "-all", "-silent", "-d", target.Host)
+	b, err := cmd.Output()
+	if err != nil {
+		panic(err)
+	}
+	sc := bufio.NewScanner(bytes.NewReader(b))
+	for sc.Scan() {
+		s := sc.Text()
+		hosts := extractHosts(s)
+		for _, host := range hosts {
+			subtarget := &Target{
+				Host: host,
+				hunt: target.hunt,
+			}
+
+			if !target.hunt.AddTarget(subtarget) {
+				continue
+			}
+
+			log.Printf("new target: %s", subtarget.Host)
+
+			globalWG.Add(1)
+			go func() {
+				defer globalWG.Done()
+				connSemaphore <- struct{}{}
+				defer func() { <-connSemaphore }()
+
+				subtarget.Hunt()
+			}()
+		}
 	}
 
 	// todo: loop subdomains and `go t.Hunt(wg)`

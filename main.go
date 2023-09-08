@@ -1,8 +1,10 @@
 package main
 
 import (
+	"crypto/tls"
 	"flag"
 	"log"
+	"net/http"
 	"os"
 	"sync"
 	"time"
@@ -19,9 +21,19 @@ var (
 	flagSubdomains = flag.Bool("s", false, "hunt for subdomains")
 	flagMaxConn    = flag.Int("c", 150, "maximum connections across all targets")
 	flagVerbose    = flag.Bool("v", false, "verbose")
+
+	httpclient = &http.Client{
+		Timeout: 10 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+	}
 )
 
 func init() {
+	if *flagMaxConn < 5 {
+		log.Fatalln("maximum connections (flag -c) cannot be under 5")
+	}
 	connSemaphore = make(chan struct{}, *flagMaxConn)
 
 	var err error
@@ -40,9 +52,17 @@ func main() {
 		if os.IsNotExist(err) {
 			hunt.Scope = []string{""}
 			hunt.Save()
+			log.Printf("add scope to %s", filename)
 			os.Exit(0)
 		}
 		panic(err)
+	}
+
+	// only print current hunt if requested
+	if flag.Arg(0) == "p" {
+		hunt.Print()
+		os.Exit(0)
+
 	}
 
 	// always save hunt at the end
