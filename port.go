@@ -74,7 +74,7 @@ func (p *Port) Hunt() error {
 				defer func() { <-connSemaphore }()
 
 				if err := hp.Hunt(); err != nil {
-					if err != errIrrelevantPath {
+					if *flagVerbose && err != errIrrelevantPath {
 						log.Printf("error on %s:%d/%s: %v", p.Target.Host, p.Number, hp.Path, err)
 					}
 					return

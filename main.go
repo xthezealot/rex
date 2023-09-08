@@ -18,6 +18,7 @@ var (
 
 	flagSubdomains = flag.Bool("s", false, "hunt for subdomains")
 	flagMaxConn    = flag.Int("c", 150, "maximum connections across all targets")
+	flagVerbose    = flag.Bool("v", false, "verbose")
 )
 
 func init() {
@@ -57,5 +58,7 @@ func main() {
 	hunt.Go()
 	globalWG.Wait()
 
-	printStats(start)
+	if *flagVerbose {
+		printStats(start)
+	}
 }

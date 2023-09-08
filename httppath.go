@@ -57,7 +57,7 @@ type HTTPPath struct {
 	Path string `yaml:"-"`
 
 	Status      int      `yaml:",omitempty"`
-	ContentType string   `yaml:",omitempty"`
+	ContentType string   `yaml:"contentType,omitempty"`
 	Title       string   `yaml:",omitempty"`
 	Tech        []string `yaml:",omitempty"`
 }
@@ -130,6 +130,7 @@ func (hp *HTTPPath) Hunt() error {
 	}
 
 	// if interesting content type, store response
+	// todo: make its own func and don't return error for path if file cannot be written
 	if _, ok := downloadableContentTypes[hp.ContentType]; ok {
 		// create dir
 		storagePath := filepath.Join(currentDir, "http", hp.Port.Target.Host, strconv.Itoa(hp.Port.Number), sanitizeFilepath(hp.Path), "index.http")

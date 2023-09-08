@@ -30,8 +30,10 @@ func (target *Target) Hunt() {
 			defer func() { <-connSemaphore }()
 
 			if err := port.Hunt(); err != nil {
-				if _, ok := err.(net.Error); !ok { // err is other than timeout
-					log.Printf("error on %s:%d: %v", target.Host, port.Number, err)
+				if *flagVerbose {
+					if _, ok := err.(net.Error); !ok { // err is other than timeout
+						log.Printf("error on %s:%d: %v", target.Host, port.Number, err)
+					}
 				}
 				return
 			}
