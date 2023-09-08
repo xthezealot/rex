@@ -2,9 +2,12 @@ package main
 
 import (
 	"encoding/binary"
+	"fmt"
 	"net"
 	"net/url"
+	"runtime"
 	"strings"
+	"time"
 )
 
 var userAgents = []string{
@@ -82,4 +85,41 @@ func ipsFromIPNet(ipnet *net.IPNet) (ips []net.IP) {
 
 func isIP(s string) bool {
 	return net.ParseIP(s) != nil
+}
+
+func sanitizeFilepath(fp string) string {
+	fp, err := url.PathUnescape(fp)
+	if err != nil {
+		return ""
+	}
+
+	disallowedChars := []string{"..", "\x00", " ", "*", "?", "[", "]", "`", "$", "\"", "'", ":", "\\", "<", ">", "|"}
+	for _, c := range disallowedChars {
+		fp = strings.ReplaceAll(fp, c, "_")
+	}
+
+	maxLength := 255
+	if len(fp) > maxLength {
+		fp = fp[:maxLength]
+	}
+
+	return fp
+}
+
+func bToMb(b uint64) uint64 {
+	return b / 1024 / 1024
+}
+
+func printStats(start time.Time) {
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+
+	fmt.Println("------")
+	fmt.Print("STATS:")
+	fmt.Printf("\tTime = %s", time.Since(start))
+	fmt.Printf("\tAlloc = %v MiB", bToMb(m.Alloc))
+	fmt.Printf("\tTotalAlloc = %v MiB", bToMb(m.TotalAlloc))
+	fmt.Printf("\tSys = %v MiB", bToMb(m.Sys))
+	fmt.Printf("\tNumGC = %v\n", m.NumGC)
+	fmt.Println("------")
 }

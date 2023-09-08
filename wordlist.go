@@ -1984,6 +1984,7 @@ var pathsWordlist = map[string]struct{}{
 	"tools.sh":                                     {},
 	"tools":                                        {},
 	"tox.ini":                                      {},
+	"Trace.axd":                                    {},
 	"transfer.sql":                                 {},
 	"trash":                                        {},
 	"two":                                          {},

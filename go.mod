@@ -1,8 +1,8 @@
-module github.com/xthezealot/autobb
+module github.com/xthezealot/rex
 
-go 1.20
+go 1.21
 
 require (
-	golang.org/x/net v0.10.0
+	golang.org/x/net v0.15.0
 	gopkg.in/yaml.v3 v3.0.1
 )
