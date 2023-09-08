@@ -94,8 +94,14 @@ func (hunt *Hunt) Print() {
 		fmt.Printf("%s\n", targetHost)
 		for portNumber, port := range target.Ports {
 			fmt.Printf("\t:%d  %s  %s\n", portNumber, port.Name, port.Version)
-			for _, path := range port.Paths {
-				fmt.Printf("\t\t%s  %d  %s  %s  %s\n", path.Path, path.Status, path.ContentType, path.Tech, path.Title)
+			for pathstr, path := range port.Paths {
+				var status string
+				if path.Status <= 299 {
+					status = fmt.Sprintf("\033[33m%d\033[0m", path.Status)
+				} else {
+					status = fmt.Sprintf("\033[31m%d\033[0m", path.Status)
+				}
+				fmt.Printf("\t\t%s  %s  %s  %s  %s\n", pathstr, status, path.ContentType, path.Tech, path.Title)
 			}
 		}
 	}
