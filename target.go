@@ -89,6 +89,4 @@ func (target *Target) HuntSubdomains() {
 			}()
 		}
 	}
-
-	// todo: loop subdomains and `go t.Hunt(wg)`
 }

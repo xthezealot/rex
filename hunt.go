@@ -94,6 +94,12 @@ func (hunt *Hunt) Print() {
 		fmt.Printf("%s\n", targetHost)
 		for portNumber, port := range target.Ports {
 			fmt.Printf("\t:%d  %s  %s\n", portNumber, port.Name, port.Version)
+			if len(port.CRLFVuln) > 0 {
+				fmt.Printf("\t\t\tCRLF vulns\n")
+				for _, url := range port.CRLFVuln {
+					fmt.Printf("\033[33m%s\033[0m\n", url)
+				}
+			}
 			for pathstr, path := range port.Paths {
 				var status string
 				if path.Status <= 299 {

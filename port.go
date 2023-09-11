@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/dwisiswant0/crlfuzz/pkg/crlfuzz"
 )
 
 var commonPorts = map[int]string{
@@ -37,17 +39,30 @@ var commonPorts = map[int]string{
 }
 
 type Port struct {
-	Target  *Target `yaml:"-"`
-	Number  int     `yaml:"-"`
-	Name    string
-	Version string               `yaml:",omitempty"`
-	Paths   map[string]*HTTPPath `yaml:",omitempty"` // map of paths to http response
+	Target   *Target `yaml:"-"`
+	Number   int     `yaml:"-"`
+	Name     string
+	Version  string               `yaml:",omitempty"`
+	CRLFVuln []string             `yaml:"crlfVuln,omitempty"`
+	Paths    map[string]*HTTPPath `yaml:",omitempty"` // map of paths to http response
 
 	mu sync.Mutex
 }
 
+func (p *Port) Host() string {
+	return p.Target.Host + ":" + strconv.Itoa(p.Number)
+}
+
+func (p *Port) URL() string {
+	scheme := "http"
+	if p.Number == 443 || p.Number == 8443 {
+		scheme += "s"
+	}
+	return scheme + "://" + p.Host()
+}
+
 func (p *Port) Hunt() error {
-	conn, err := net.DialTimeout("tcp", p.Target.Host+":"+strconv.Itoa(p.Number), 5*time.Second)
+	conn, err := net.DialTimeout("tcp", p.Host(), 5*time.Second)
 	if err != nil {
 		return err
 	}
@@ -59,6 +74,25 @@ func (p *Port) Hunt() error {
 	// common http ports
 	case 80, 443, 3000, 5000, 8000, 8008, 8080, 8081, 8443, 8888:
 		p.Paths = make(map[string]*HTTPPath)
+
+		// check crlf vuln
+		for _, url := range crlfuzz.GenerateURL(p.Host()) {
+			globalWG.Add(1)
+			go func(url string) {
+				defer globalWG.Done()
+				connSemaphore <- struct{}{}
+				defer func() { <-connSemaphore }()
+
+				vuln, err := crlfuzz.Scan(url, "GET", "", nil, "")
+				if err != nil {
+					log.Printf("error on crlf check for %s: %v", url, err)
+				}
+				if vuln {
+					p.CRLFVuln = append(p.CRLFVuln, url)
+					log.Printf("crlf vuln on %s", url)
+				}
+			}(url)
+		}
 
 		// bruteforce paths
 		for path := range pathsWordlist {

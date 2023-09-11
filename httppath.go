@@ -64,14 +64,12 @@ type HTTPPath struct {
 	Tech        []string `yaml:",omitempty"`
 }
 
-func (hp *HTTPPath) Hunt() error {
-	url := "http"
-	if hp.Port.Number == 443 || hp.Port.Number == 8443 {
-		url += "s"
-	}
-	url += "://" + hp.Port.Target.Host + ":" + strconv.Itoa(hp.Port.Number) + "/" + hp.Path
+func (hp *HTTPPath) URL() string {
+	return hp.Port.URL() + "/" + hp.Path
+}
 
-	req, err := http.NewRequest("GET", url, nil)
+func (hp *HTTPPath) Hunt() error {
+	req, err := http.NewRequest("GET", hp.URL(), nil)
 	if err != nil {
 		return err
 	}
@@ -181,7 +179,7 @@ func (hp *HTTPPath) Hunt() error {
 				crawler(doc)
 			} else {
 				if *flagVerbose {
-					log.Printf("error parsing html on %s: %v", url, err)
+					log.Printf("error parsing html on %s: %v", hp.URL(), err)
 				}
 			}
 		}
