@@ -76,7 +76,7 @@ func (p *Port) Hunt() error {
 		p.Paths = make(map[string]*HTTPPath)
 
 		// check crlf vuln
-		for _, url := range crlfuzz.GenerateURL(p.Host()) {
+		for _, url := range crlfuzz.GenerateURL(p.URL()) {
 			globalWG.Add(1)
 			go func(url string) {
 				defer globalWG.Done()
@@ -84,7 +84,7 @@ func (p *Port) Hunt() error {
 				defer func() { <-connSemaphore }()
 
 				vuln, err := crlfuzz.Scan(url, "GET", "", nil, "")
-				if err != nil {
+				if *flagVerbose && err != nil {
 					log.Printf("error on crlf check for %s: %v", url, err)
 				}
 				if vuln {
