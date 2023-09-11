@@ -10,8 +10,8 @@ It was first created with bug bounty needs in mind, replacing multi-tool workflo
 - Full **parallelism**
 - Scan **common ports**
 - Discover **URL paths** form an integrated wordlist of manually filtered and high-quality keywords (2200+)
-- Search for subdomains (use flag `-s`)
-- Pretty print (use subcommand `p`)
+- Search for **subdomains** (use flag `-s`)
+- **Pretty print** (use subcommand `p`)
 
 ## Install
 
