@@ -9,10 +9,11 @@ It was first created with bug bounty needs in mind, replacing multi-tool workflo
 
 - Full **parallelism**
 - Scan **common ports**
-- Discover **URL paths** form an integrated wordlist of manually filtered and high-quality keywords (2200+)
+- Discover **URL paths**
 - Search for **subdomains** (use flag `-s`)
 - Scan for common **vulnerabilities** (XSS, CRLF, …)
 - Save interesting **HTTP responses** for manual inspection
+- Integrates a manually-filtered and high-quality **wordlist** (2200+)
 - **Pretty print** (use subcommand `p`)
 
 ## Install
