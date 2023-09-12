@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"math/rand"
 	"mime"
 	"net/http"
 	"os"
@@ -12,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	dalfox "github.com/hahwul/dalfox/v2/lib"
 	"golang.org/x/net/html"
 )
 
@@ -54,18 +54,89 @@ var downloadableContentTypes = map[string]struct{}{
 	"text/xml":               {},
 }
 
+type XSSPoC struct {
+	Data     string `yaml:",omitempty"`
+	Param    string `yaml:",omitempty"`
+	Payload  string `yaml:",omitempty"`
+	Evidence string `yaml:",omitempty"`
+	CWE      string `yaml:",omitempty"`
+	Severity string `yaml:",omitempty"`
+}
+
 type HTTPPath struct {
 	Port *Port  `yaml:"-"`
 	Path string `yaml:"-"`
 
-	Status      int      `yaml:",omitempty"`
-	ContentType string   `yaml:"contentType,omitempty"`
-	Title       string   `yaml:",omitempty"`
-	Tech        []string `yaml:",omitempty"`
+	Status      int       `yaml:",omitempty"`
+	ContentType string    `yaml:"contentType,omitempty"`
+	Title       string    `yaml:",omitempty"`
+	Tech        []string  `yaml:",omitempty"`
+	XSS         []*XSSPoC `yaml:",omitempty"`
+
+	storageFile *os.File
+}
+
+func (hp *HTTPPath) StoragePath() string {
+	return filepath.Join(currentDir, "http", hp.Port.Target.Host, strconv.Itoa(hp.Port.Number), sanitizeFilepath(hp.Path), "index.http")
 }
 
 func (hp *HTTPPath) URL() string {
 	return hp.Port.URL() + "/" + hp.Path
+}
+
+func (hp *HTTPPath) Save(res *http.Response) (err error) {
+	if _, ok := downloadableContentTypes[hp.ContentType]; !ok {
+		return fmt.Errorf("content type %q is not interesting for download", hp.ContentType)
+	}
+
+	storagePath := hp.StoragePath()
+
+	// create dir
+	storageDirpath := filepath.Dir(storagePath)
+	if err = os.MkdirAll(storageDirpath, 0755); err != nil {
+		return
+	}
+
+	// create file
+	if hp.storageFile, err = os.Create(storagePath); err != nil {
+		return
+	}
+	defer hp.storageFile.Close()
+
+	// save http response to file
+	hp.storageFile.WriteString(fmt.Sprintf("HTTP/%d.%d %d %s\r\n", res.ProtoMajor, res.ProtoMinor, res.StatusCode, res.Status))
+	for key, values := range res.Header {
+		for _, value := range values {
+			if _, err = hp.storageFile.WriteString(fmt.Sprintf("%s: %s\r\n", key, value)); err != nil {
+				return
+			}
+		}
+	}
+	if _, err = hp.storageFile.WriteString("\r\n"); err != nil {
+		return
+	}
+	_, err = hp.storageFile.ReadFrom(res.Body)
+	return
+}
+
+func (hp *HTTPPath) ParseTitle() error {
+	if hp.ContentType != "text/html" {
+		return nil // don't show an error because of content type
+	}
+
+	f, err := os.Open(hp.StoragePath())
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	doc, err := html.Parse(f)
+	if err != nil {
+		return err
+	}
+
+	hp.Title = parseTitle(doc)
+	return nil
 }
 
 func (hp *HTTPPath) Hunt() error {
@@ -74,7 +145,7 @@ func (hp *HTTPPath) Hunt() error {
 		return err
 	}
 
-	req.Header.Set("User-Agent", userAgents[rand.Intn(len(userAgents))]) // use random user-agent
+	req.Header.Set("User-Agent", randUserAgent()) // use random user-agent
 
 	// make request (following redirects)
 	res, err := httpclient.Do(req)
@@ -130,70 +201,49 @@ func (hp *HTTPPath) Hunt() error {
 	}
 
 	// if interesting content type, store response
-	// todo: make its own func and don't return error for path if file cannot be written
-	if _, ok := downloadableContentTypes[hp.ContentType]; ok {
-		// create dir
-		storagePath := filepath.Join(currentDir, "http", hp.Port.Target.Host, strconv.Itoa(hp.Port.Number), sanitizeFilepath(hp.Path), "index.http")
-		storageDirpath := filepath.Dir(storagePath)
-		if err = os.MkdirAll(storageDirpath, 0755); err != nil {
-			if *flagVerbose {
-				log.Printf("error creating dir %s: %v", storageDirpath, err)
-			}
-		}
-
-		// create file
-		storageFile, _ := os.Create(storagePath)
-		if err != nil {
-			if *flagVerbose {
-				log.Printf("error creating file %s: %v", storagePath, err)
-			}
-		}
-		defer storageFile.Close()
-
-		// save http response to file
-		storageFile.WriteString(fmt.Sprintf("HTTP/%d.%d %d %s\r\n", res.ProtoMajor, res.ProtoMinor, res.StatusCode, res.Status))
-		for key, values := range res.Header {
-			for _, value := range values {
-				storageFile.WriteString(fmt.Sprintf("%s: %s\r\n", key, value))
-			}
-		}
-		storageFile.WriteString("\r\n")
-		storageFile.ReadFrom(res.Body)
-
-		// if html, get title
-		if hp.ContentType == "text/html" {
-			storageFile.Seek(0, 0) // reset file reader
-			doc, err := html.Parse(storageFile)
-			if err == nil {
-				var crawler func(*html.Node)
-				crawler = func(n *html.Node) {
-					if n.Type == html.ElementNode && n.Data == "title" {
-						if n.FirstChild != nil {
-							hp.Title = n.FirstChild.Data
-						}
-					}
-					for c := n.FirstChild; c != nil; c = c.NextSibling {
-						crawler(c)
-					}
-				}
-				crawler(doc)
-			} else {
-				if *flagVerbose {
-					log.Printf("error parsing html on %s: %v", hp.URL(), err)
-				}
-			}
-		}
-
-		// ditch waf pages
-		if strings.Contains(hp.Title, "Cloudflare") {
-			return errIrrelevantPath
-		}
-
-		// todo: search for secrets in response body
-
-		// todo: if path is /robots.txt, parse file content and add paths to loop
-
+	if err = hp.Save(res); *flagVerbose && err != nil {
+		log.Printf("error saving request on disk for %s: %v", hp.URL(), err)
 	}
+
+	// get title if html
+	if err = hp.ParseTitle(); *flagVerbose && err != nil {
+		log.Printf("error parsing title on %s: %v", hp.URL(), err)
+	}
+
+	// ditch waf pages
+	if strings.Contains(hp.Title, "Cloudflare") {
+		return errIrrelevantPath
+	}
+
+	// xss scan
+	xss, err := dalfox.NewScan(dalfox.Target{
+		Method: "GET",
+		URL:    hp.URL(),
+		Options: dalfox.Options{
+			UserAgent: randUserAgent(),
+		},
+	})
+	if err != nil {
+		if *flagVerbose {
+			log.Printf("error on xss check for  %s: %v", hp.URL(), err)
+		}
+	} else if xss.IsFound() {
+		for _, poc := range xss.PoCs {
+			hp.XSS = append(hp.XSS, &XSSPoC{
+				Data:     poc.Data,
+				Param:    poc.Param,
+				Payload:  poc.Payload,
+				Evidence: poc.Evidence,
+				CWE:      poc.CWE,
+				Severity: poc.Severity,
+			})
+		}
+		log.Printf("xss vuln on %s", hp.URL())
+	}
+
+	// todo: search for secrets in response body
+
+	// todo: if path is /robots.txt, parse file content and add paths to loop
 
 	// todo: nuclei tech-adapted scan
 

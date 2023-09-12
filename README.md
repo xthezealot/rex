@@ -11,6 +11,8 @@ It was first created with bug bounty needs in mind, replacing multi-tool workflo
 - Scan **common ports**
 - Discover **URL paths** form an integrated wordlist of manually filtered and high-quality keywords (2200+)
 - Search for **subdomains** (use flag `-s`)
+- Scan for common **vulnerabilities** (XSS, CRLF, …)
+- Save interesting **HTTP responses** for manual inspection
 - **Pretty print** (use subcommand `p`)
 
 ## Install
@@ -24,17 +26,20 @@ Rex also depends on these external commands:
 # Usage
 
 1. Run `rex` to create a base file in the current directory:
+
    ```bash
    rex
    ```
 
 2. Add your scope to `hunt.yml` (a list of domain names, IP addresses or CIDR ranges):
+
    ```yml
    scope:
-       - example.com
-       - 111.111.111.111
-       - 10.0.0.0/29
+     - example.com
+     - 111.111.111.111
+     - 10.0.0.0/29
    ```
+
 3. Run `rex` to parse the scope from `hunt.yml` and start hunting.  
    ⚠️ Rex sends a lot of parallel requests, so don't use your home IP address.
 
@@ -43,3 +48,4 @@ Rex also depends on these external commands:
 
 5. 50% of the job is done.  
    Now, move onto the 50% manual work to find P1 and P2 vulns.
+   You can start by analysing HTTP responses saved in the `http` directory.

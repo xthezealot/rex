@@ -75,7 +75,7 @@ func (p *Port) Hunt() error {
 	case 80, 443, 3000, 5000, 8000, 8008, 8080, 8081, 8443, 8888:
 		p.Paths = make(map[string]*HTTPPath)
 
-		// check crlf vuln
+		// crlf scan
 		for _, url := range crlfuzz.GenerateURL(p.URL()) {
 			globalWG.Add(1)
 			go func(url string) {
@@ -86,6 +86,7 @@ func (p *Port) Hunt() error {
 				vuln, err := crlfuzz.Scan(url, "GET", "", nil, "")
 				if *flagVerbose && err != nil {
 					log.Printf("error on crlf check for %s: %v", url, err)
+					return
 				}
 				if vuln {
 					p.CRLFVuln = append(p.CRLFVuln, url)

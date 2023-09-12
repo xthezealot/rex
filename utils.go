@@ -3,11 +3,14 @@ package main
 import (
 	"encoding/binary"
 	"fmt"
+	"math/rand"
 	"net"
 	"net/url"
 	"runtime"
 	"strings"
 	"time"
+
+	"golang.org/x/net/html"
 )
 
 var userAgents = []string{
@@ -108,6 +111,22 @@ func sanitizeFilepath(fp string) string {
 
 func bToMb(b uint64) uint64 {
 	return b / 1024 / 1024
+}
+
+func randUserAgent() string {
+	return userAgents[rand.Intn(len(userAgents))]
+}
+
+func parseTitle(n *html.Node) string {
+	if n.Type == html.ElementNode && n.Data == "title" && n.FirstChild != nil {
+		return strings.TrimSpace(n.FirstChild.Data)
+	}
+	for c := n.FirstChild; c != nil; c = c.NextSibling {
+		if title := parseTitle(c); title != "" {
+			return title
+		}
+	}
+	return ""
 }
 
 func printStats(start time.Time) {
