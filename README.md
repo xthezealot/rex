@@ -48,5 +48,5 @@ Rex also depends on these external commands:
    For a more compact and readable output, there is the `rex p` command.
 
 5. 50% of the job is done.  
-   Now, move onto the 50% manual work to find P1 and P2 vulns.
+   Now, move onto the 50% manual work to find P1 and P2 vulns.  
    You can start by analysing HTTP responses saved in the `http` directory.

@@ -95,9 +95,9 @@ func (hunt *Hunt) Print() {
 		for portNumber, port := range target.Ports {
 			fmt.Printf("\t:%d  %s  %s\n", portNumber, port.Name, port.Version)
 			if len(port.CRLFVuln) > 0 {
-				fmt.Printf("\t\t\tCRLF vulns\n")
+				fmt.Printf("\t\tCRLF vulns\n")
 				for _, url := range port.CRLFVuln {
-					fmt.Printf("\033[33m%s\033[0m\n", url)
+					fmt.Printf("\t\t\t\033[33m%s\033[0m\n", url)
 				}
 			}
 			for pathstr, path := range port.Paths {
@@ -108,6 +108,12 @@ func (hunt *Hunt) Print() {
 					status = fmt.Sprintf("\033[31m%d\033[0m", path.Status)
 				}
 				fmt.Printf("\t\t%s  %s  %s  %s  %s\n", pathstr, status, path.ContentType, path.Tech, path.Title)
+				if len(path.XSS) > 0 {
+					fmt.Printf("\t\t\tXSS vulns\n")
+					for _, poc := range path.XSS {
+						fmt.Printf("\t\t\t\t\033[33m%s\033[0m\n", poc.Data)
+					}
+				}
 			}
 		}
 	}
