@@ -30,10 +30,12 @@ var (
 	}
 )
 
-func init() {
+func main() {
+	flag.Parse()
 	if *flagMaxConn < 5 {
 		log.Fatalln("maximum connections (flag -c) cannot be under 5")
 	}
+
 	connSemaphore = make(chan struct{}, *flagMaxConn)
 
 	var err error
@@ -41,10 +43,6 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-}
-
-func main() {
-	flag.Parse()
 
 	hunt := new(Hunt)
 
