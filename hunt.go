@@ -97,21 +97,21 @@ func (hunt *Hunt) Print() {
 			if len(port.CRLFVuln) > 0 {
 				fmt.Printf("\t\tCRLF vulns\n")
 				for _, url := range port.CRLFVuln {
-					fmt.Printf("\t\t\t\033[33m%s\033[0m\n", url)
+					fmt.Printf("\t\t\t\033[32m%s\033[0m\n", url)
 				}
 			}
 			for pathstr, path := range port.Paths {
 				var status string
 				if path.Status <= 299 {
-					status = fmt.Sprintf("\033[33m%d\033[0m", path.Status)
+					status = fmt.Sprintf("\033[32m%d\033[0m", path.Status)
 				} else {
 					status = fmt.Sprintf("\033[31m%d\033[0m", path.Status)
 				}
 				fmt.Printf("\t\t%s  %s  %s  %s  %s\n", pathstr, status, path.ContentType, path.Tech, path.Title)
 				if len(path.XSS) > 0 {
-					fmt.Printf("\t\t\tXSS vulns\n")
+					fmt.Printf("\t\t\t\033[44mXSS vulns\033[0m\n")
 					for _, poc := range path.XSS {
-						fmt.Printf("\t\t\t\t\033[33m%s\033[0m\n", poc.Data)
+						fmt.Printf("\t\t\t\t?\033[34m%s\033[0m=%s\n", poc.Param, poc.Payload)
 					}
 				}
 			}

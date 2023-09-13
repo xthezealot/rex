@@ -62,7 +62,6 @@ func main() {
 	if flag.Arg(0) == "p" {
 		hunt.Print()
 		os.Exit(0)
-
 	}
 
 	// always save hunt at the end
