@@ -102,6 +102,10 @@ func (p *Port) Hunt() error {
 
 		// bruteforce paths
 		for path := range pathsWordlist {
+			if !strings.HasPrefix(path, "/") {
+				path = "/" + path
+			}
+
 			hp := &HTTPPath{
 				Port: p,
 				Path: path,

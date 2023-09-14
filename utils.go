@@ -91,12 +91,7 @@ func isIP(s string) bool {
 }
 
 func sanitizeFilepath(fp string) string {
-	fp, err := url.PathUnescape(fp)
-	if err != nil {
-		return ""
-	}
-
-	disallowedChars := []string{"..", "\x00", " ", "*", "?", "[", "]", "`", "$", "\"", "'", ":", "\\", "<", ">", "|"}
+	disallowedChars := []string{"..", "\x00", " ", "*", "?", "[", "]", "`", "$", "\"", "'", ":", "\\", "<", ">", "|", "~", "%"}
 	for _, c := range disallowedChars {
 		fp = strings.ReplaceAll(fp, c, "_")
 	}

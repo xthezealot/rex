@@ -86,19 +86,16 @@ func (hp *HTTPPath) URL() string {
 
 func (hp *HTTPPath) Save(res *http.Response) (err error) {
 	if _, ok := downloadableContentTypes[hp.ContentType]; !ok {
-		return fmt.Errorf("content type %q is not interesting for download", hp.ContentType)
+		return nil // don't show an error because of content type
 	}
 
-	storagePath := hp.StoragePath()
-
 	// create dir
-	storageDirpath := filepath.Dir(storagePath)
-	if err = os.MkdirAll(storageDirpath, 0755); err != nil {
+	if err = os.MkdirAll(filepath.Dir(hp.StoragePath()), 0755); err != nil {
 		return
 	}
 
 	// create file
-	if hp.storageFile, err = os.Create(storagePath); err != nil {
+	if hp.storageFile, err = os.Create(hp.StoragePath()); err != nil {
 		return
 	}
 	defer hp.storageFile.Close()
@@ -176,15 +173,11 @@ func (hp *HTTPPath) Hunt() error {
 		return errIrrelevantPath
 	}
 
-	hp.Path = res.Request.URL.Path
-
-	// skip if final path (after redirects) is already known
-	hp.Port.mu.Lock()
-	if _, ok := hp.Port.Paths[hp.Path]; ok {
-		hp.Port.mu.Unlock()
+	// skip if redirected to a "not found"-like page, without using status 404
+	if res.Request.URL.Path != hp.Path &&
+		(res.Request.URL.Path == "/" || strings.Contains(res.Request.URL.Path, "404") || strings.Contains(res.Request.URL.Path, "found")) {
 		return errIrrelevantPath
 	}
-	hp.Port.mu.Unlock()
 
 	// get and filter content type
 	hp.ContentType, _, _ = mime.ParseMediaType(res.Header.Get("content-type"))
