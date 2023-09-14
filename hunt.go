@@ -92,10 +92,10 @@ func (hunt *Hunt) Print(showAll bool) {
 		if len(target.Ports) == 0 {
 			continue
 		}
-		fmt.Printf("\033[1m%s\033[0m\n", targetHost)
-		for portNumber, port := range target.Ports {
+		fmt.Printf("\n\n\033[1m%s\033[0m\n", targetHost)
 
-			fmt.Printf("\t\033[1m:%d\033[0m  \033[2m%s\033[0m", portNumber, port.Name)
+		for portNumber, port := range target.Ports {
+			fmt.Printf("\n\t\033[1m:%d\033[0m  \033[2m%s\033[0m", portNumber, port.Name)
 
 			if port.Version != "" {
 				fmt.Printf("  \033[35m%s\033[0m", port.Version)
