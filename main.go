@@ -18,7 +18,8 @@ var (
 	connSemaphore chan struct{} // global http semaphore
 	globalWG      sync.WaitGroup
 
-	flagSubdomains = flag.Bool("s", false, "hunt for subdomains")
+	flagSubdomains = flag.Bool("d", false, "hunt for subdomains")
+	flagScan       = flag.Bool("s", false, "run vuln scanners during hunt")
 	flagMaxConn    = flag.Int("c", 150, "maximum connections across all targets")
 	flagVerbose    = flag.Bool("v", false, "verbose")
 
@@ -58,7 +59,11 @@ func main() {
 
 	// only print current hunt if requested
 	if flag.Arg(0) == "p" {
-		hunt.Print()
+		pCmd := flag.NewFlagSet("p", flag.ExitOnError)
+		allFlag := pCmd.Bool("a", false, "show all paths (even errors)")
+		pCmd.Parse(os.Args[2:])
+
+		hunt.Print(*allFlag)
 		os.Exit(0)
 	}
 

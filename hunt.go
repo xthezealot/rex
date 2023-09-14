@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"sync"
 
 	"gopkg.in/yaml.v3"
@@ -86,32 +87,64 @@ func (hunt *Hunt) Go() {
 	}
 }
 
-func (hunt *Hunt) Print() {
+func (hunt *Hunt) Print(showAll bool) {
 	for targetHost, target := range hunt.Targets {
 		if len(target.Ports) == 0 {
 			continue
 		}
-		fmt.Printf("%s\n", targetHost)
+		fmt.Printf("\033[1m%s\033[0m\n", targetHost)
 		for portNumber, port := range target.Ports {
-			fmt.Printf("\t:%d  %s  %s\n", portNumber, port.Name, port.Version)
+
+			fmt.Printf("\t\033[1m:%d\033[0m  \033[2m%s\033[0m", portNumber, port.Name)
+
+			if port.Version != "" {
+				fmt.Printf("  \033[35m%s\033[0m", port.Version)
+			}
+
+			fmt.Print("\n")
+
 			if len(port.CRLFVuln) > 0 {
-				fmt.Printf("\t\tCRLF vulns\n")
+				fmt.Printf("\t\t\033[5;27;41m CRLF vulns \033[0m\n")
 				for _, url := range port.CRLFVuln {
-					fmt.Printf("\t\t\t\033[32m%s\033[0m\n", url)
+					fmt.Printf("\t\t\t\033[31m%s\033[0m\n", url)
 				}
 			}
+
 			for pathstr, path := range port.Paths {
+				if !showAll && path.Status >= 300 {
+					continue
+				}
+
 				var status string
+
 				if path.Status <= 299 {
 					status = fmt.Sprintf("\033[32m%d\033[0m", path.Status)
 				} else {
 					status = fmt.Sprintf("\033[31m%d\033[0m", path.Status)
 				}
-				fmt.Printf("\t\t%s  %s  %s  %s  %s\n", pathstr, status, path.ContentType, path.Tech, path.Title)
+
+				fmt.Printf("\t\t\033[1m%s\033[0m  %s", pathstr, status)
+
+				if path.ContentType == "text/html" {
+					fmt.Printf("  \033[33m%s\033[0m", path.ContentType)
+				} else if path.ContentType != "" {
+					fmt.Printf("  \033[93m%s\033[0m", path.ContentType)
+				}
+
+				if len(path.Tech) > 0 {
+					fmt.Printf("  \033[35m%s\033[0m", strings.Join(path.Tech, ", "))
+				}
+
+				if path.Title != "" {
+					fmt.Printf("  \033[34m%s\033[0m", path.Title)
+				}
+
+				fmt.Print("\n")
+
 				if len(path.XSS) > 0 {
-					fmt.Printf("\t\t\t\033[44mXSS vulns\033[0m\n")
+					fmt.Printf("\t\t\t\033[5;27;41m XSS vulns \033[0m\n")
 					for _, poc := range path.XSS {
-						fmt.Printf("\t\t\t\t?\033[34m%s\033[0m=%s\n", poc.Param, poc.Payload)
+						fmt.Printf("\t\t\t\t?\033[31m%s\033[0m=%s\n", poc.Param, poc.Payload)
 					}
 				}
 			}

@@ -215,7 +215,29 @@ func (hp *HTTPPath) Hunt() error {
 		return errIrrelevantPath
 	}
 
-	// xss scan
+	// todo: if path is /robots.txt, parse file content and add paths to loop
+
+	// run scanners if status is promising
+	if *flagScan && hp.Status <= 299 {
+		if err = hp.ScanXSS(); *flagVerbose && err != nil {
+			log.Printf("error on xss check for  %s: %v", hp.URL(), err)
+		}
+
+		// todo: scan for cors
+		// todo: scan for open redirection (see github.com/r0075h3ll/oralyzer)
+		// todo: scan for prototype pollution (see github.com/dwisiswant0/ppfuzz)
+		// todo: scan for sqli
+		// todo: scan for ssrf
+		// todo: scan for ssti according to tech detected
+		// todo: scan for secrets in response body
+		// todo: nuclei tech-adapted scan
+	}
+
+	return nil
+}
+
+// todo: custom xss scan
+func (hp *HTTPPath) ScanXSS() error {
 	xss, err := dalfox.NewScan(dalfox.Target{
 		Method: "GET",
 		URL:    hp.URL(),
@@ -223,29 +245,25 @@ func (hp *HTTPPath) Hunt() error {
 			UserAgent: randUserAgent(),
 		},
 	})
+
 	if err != nil {
-		if *flagVerbose {
-			log.Printf("error on xss check for  %s: %v", hp.URL(), err)
-		}
-	} else if xss.IsFound() {
-		for _, poc := range xss.PoCs {
-			hp.XSS = append(hp.XSS, &XSSPoC{
-				Data:     poc.Data,
-				Param:    poc.Param,
-				Payload:  poc.Payload,
-				Evidence: poc.Evidence,
-				CWE:      poc.CWE,
-				Severity: poc.Severity,
-			})
-		}
-		log.Printf("xss vuln on %s", hp.URL())
+		return err
+	}
+	if !xss.IsFound() {
+		return nil
 	}
 
-	// todo: search for secrets in response body
+	for _, poc := range xss.PoCs {
+		hp.XSS = append(hp.XSS, &XSSPoC{
+			Data:     poc.Data,
+			Param:    poc.Param,
+			Payload:  poc.Payload,
+			Evidence: poc.Evidence,
+			CWE:      poc.CWE,
+			Severity: poc.Severity,
+		})
+	}
 
-	// todo: if path is /robots.txt, parse file content and add paths to loop
-
-	// todo: nuclei tech-adapted scan
-
+	log.Printf("xss vuln on %s", hp.URL())
 	return nil
 }

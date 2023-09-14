@@ -75,24 +75,29 @@ func (p *Port) Hunt() error {
 	case 80, 443, 3000, 5000, 8000, 8008, 8080, 8081, 8443, 8888:
 		p.Paths = make(map[string]*HTTPPath)
 
-		// crlf scan
-		for _, url := range crlfuzz.GenerateURL(p.URL()) {
-			globalWG.Add(1)
-			go func(url string) {
-				defer globalWG.Done()
-				connSemaphore <- struct{}{}
-				defer func() { <-connSemaphore }()
+		// todo: scan for ssl (see github.com/drwetter/testssl.sh)
 
-				vuln, err := crlfuzz.Scan(url, "GET", "", nil, "")
-				if *flagVerbose && err != nil {
-					log.Printf("error on crlf check for %s: %v", url, err)
-					return
-				}
-				if vuln {
-					p.CRLFVuln = append(p.CRLFVuln, url)
-					log.Printf("crlf vuln on %s", url)
-				}
-			}(url)
+		if *flagScan {
+			// crlf scan
+			// todo: custom crlf vuln scan (see github.com/r0075h3ll/oralyzer/blob/master/core/crlf.py & github.com/dwisiswant0/crlfuzz/tree/master/pkg)
+			for _, url := range crlfuzz.GenerateURL(p.URL()) {
+				globalWG.Add(1)
+				go func(url string) {
+					defer globalWG.Done()
+					connSemaphore <- struct{}{}
+					defer func() { <-connSemaphore }()
+
+					vuln, err := crlfuzz.Scan(url, "GET", "", nil, "")
+					if *flagVerbose && err != nil {
+						log.Printf("error on crlf check for %s: %v", url, err)
+						return
+					}
+					if vuln {
+						p.CRLFVuln = append(p.CRLFVuln, url)
+						log.Printf("crlf vuln on %s", url)
+					}
+				}(url)
+			}
 		}
 
 		// bruteforce paths
@@ -145,7 +150,7 @@ func (p *Port) Hunt() error {
 
 	// todo: 445 (smb): see smbclient and enum4linux
 
-	// todo: 1433 (mssql): see https://svn.nmap.org/nmap/scripts/ms-sql-ntlm-info.nse
+	// todo: 1433 (mssql): see svn.nmap.org/nmap/scripts/ms-sql-ntlm-info.nse
 
 	// mysql
 	case 3306:
