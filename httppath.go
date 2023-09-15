@@ -91,6 +91,7 @@ func (hp *HTTPPath) AddTech(s string) {
 	if s == "" {
 		return
 	}
+	s = strings.ToLower(s)
 	for _, tech := range hp.Tech {
 		if tech == s {
 			return
