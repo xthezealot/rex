@@ -204,7 +204,9 @@ func (hp *HTTPPath) Hunt() error {
 	}
 
 	// ditch waf pages
-	if strings.Contains(hp.Title, "Cloudflare") {
+	titleLower := strings.ToLower(hp.Title)
+	if strings.Contains(titleLower, "cloudflare") ||
+		strings.Contains(titleLower, "verify") && strings.Contains(titleLower, "human") {
 		return errIrrelevantPath
 	}
 
@@ -231,6 +233,10 @@ func (hp *HTTPPath) Hunt() error {
 
 // todo: custom xss scan
 func (hp *HTTPPath) ScanXSS() error {
+	if hp.ContentType != "text/html" {
+		return nil
+	}
+
 	xss, err := dalfox.NewScan(dalfox.Target{
 		Method: "GET",
 		URL:    hp.URL(),
