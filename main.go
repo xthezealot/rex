@@ -8,6 +8,8 @@ import (
 	"os"
 	"sync"
 	"time"
+
+	wappalyzer "github.com/projectdiscovery/wappalyzergo"
 )
 
 const filename = "hunt.yml"
@@ -22,6 +24,8 @@ var (
 	flagScan       = flag.Bool("s", false, "run vuln scanners during hunt")
 	flagMaxConn    = flag.Int("c", 150, "maximum connections across all targets")
 	flagVerbose    = flag.Bool("v", false, "verbose")
+
+	wappalyzerClient *wappalyzer.Wappalyze
 
 	httpclient = &http.Client{
 		Timeout: 10 * time.Second,
@@ -40,8 +44,12 @@ func main() {
 	connSemaphore = make(chan struct{}, *flagMaxConn)
 
 	var err error
-	currentDir, err = os.Getwd()
-	if err != nil {
+
+	if currentDir, err = os.Getwd(); err != nil {
+		panic(err)
+	}
+
+	if wappalyzerClient, err = wappalyzer.New(); err != nil {
 		panic(err)
 	}
 

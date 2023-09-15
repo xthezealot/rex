@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"mime"
 	"net/http"
@@ -73,7 +75,7 @@ type HTTPPath struct {
 	Tech        []string  `yaml:",omitempty"`
 	XSS         []*XSSPoC `yaml:",omitempty"`
 
-	storageFile *os.File
+	body []byte
 }
 
 func (hp *HTTPPath) StoragePath() string {
@@ -84,56 +86,17 @@ func (hp *HTTPPath) URL() string {
 	return hp.Port.URL() + "/" + hp.Path
 }
 
-func (hp *HTTPPath) Save(res *http.Response) (err error) {
-	if _, ok := downloadableContentTypes[hp.ContentType]; !ok {
-		return nil // don't show an error because of content type
-	}
-
-	// create dir
-	if err = os.MkdirAll(filepath.Dir(hp.StoragePath()), 0755); err != nil {
+func (hp *HTTPPath) AddTech(s string) {
+	s = strings.TrimSpace(s)
+	if s == "" {
 		return
 	}
-
-	// create file
-	if hp.storageFile, err = os.Create(hp.StoragePath()); err != nil {
-		return
-	}
-	defer hp.storageFile.Close()
-
-	// save http response to file
-	hp.storageFile.WriteString(fmt.Sprintf("HTTP/%d.%d %d %s\r\n", res.ProtoMajor, res.ProtoMinor, res.StatusCode, res.Status))
-	for key, values := range res.Header {
-		for _, value := range values {
-			if _, err = hp.storageFile.WriteString(fmt.Sprintf("%s: %s\r\n", key, value)); err != nil {
-				return
-			}
+	for _, tech := range hp.Tech {
+		if tech == s {
+			return
 		}
 	}
-	if _, err = hp.storageFile.WriteString("\r\n"); err != nil {
-		return
-	}
-	_, err = hp.storageFile.ReadFrom(res.Body)
-	return
-}
-
-func (hp *HTTPPath) ParseTitle() error {
-	if hp.ContentType != "text/html" {
-		return nil // don't show an error because of content type
-	}
-
-	f, err := os.Open(hp.StoragePath())
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	doc, err := html.Parse(f)
-	if err != nil {
-		return err
-	}
-
-	hp.Title = parseTitle(doc)
-	return nil
+	hp.Tech = append(hp.Tech, s)
 }
 
 func (hp *HTTPPath) Hunt() error {
@@ -185,17 +148,9 @@ func (hp *HTTPPath) Hunt() error {
 		return errIrrelevantPath
 	}
 
-	// get server info
-	if tech := res.Header.Get("server"); tech != "" {
-		hp.Tech = append(hp.Tech, tech)
-	}
-	if tech := res.Header.Get("x-server"); tech != "" {
-		hp.Tech = append(hp.Tech, tech)
-	}
-
-	// if interesting content type, store response
-	if err = hp.Save(res); *flagVerbose && err != nil {
-		log.Printf("error saving request on disk for %s: %v", hp.URL(), err)
+	// ok until there, store response
+	if hp.body, err = io.ReadAll(res.Body); err != nil {
+		return err
 	}
 
 	// get title if html
@@ -203,11 +158,25 @@ func (hp *HTTPPath) Hunt() error {
 		log.Printf("error parsing title on %s: %v", hp.URL(), err)
 	}
 
-	// ditch waf pages
+	// ditch waf pages based on title
 	titleLower := strings.ToLower(hp.Title)
 	if strings.Contains(titleLower, "cloudflare") ||
 		strings.Contains(titleLower, "verify") && strings.Contains(titleLower, "human") {
 		return errIrrelevantPath
+	}
+
+	// get server info
+	hp.AddTech(res.Header.Get("server"))
+	hp.AddTech(res.Header.Get("x-server"))
+
+	// wappalyze tech
+	if err = hp.Wappalyze(res); *flagVerbose && err != nil {
+		log.Printf("error wappalyzing %s: %v", hp.URL(), err)
+	}
+
+	// if interesting content type, store response
+	if err = hp.Save(res); *flagVerbose && err != nil {
+		log.Printf("error saving request on disk for %s: %v", hp.URL(), err)
 	}
 
 	// todo: if path is /robots.txt, parse file content and add paths to loop
@@ -226,6 +195,65 @@ func (hp *HTTPPath) Hunt() error {
 		// todo: scan for ssti according to tech detected
 		// todo: scan for secrets in response body
 		// todo: nuclei tech-adapted scan
+	}
+
+	return nil
+}
+
+func (hp *HTTPPath) Save(res *http.Response) (err error) {
+	if _, ok := downloadableContentTypes[hp.ContentType]; !ok {
+		return nil // don't show an error because of content type
+	}
+
+	// create dir
+	if err = os.MkdirAll(filepath.Dir(hp.StoragePath()), 0755); err != nil {
+		return
+	}
+
+	// create file
+	var f *os.File
+	if f, err = os.Create(hp.StoragePath()); err != nil {
+		return
+	}
+	defer f.Close()
+
+	// save http response to file
+	f.WriteString(fmt.Sprintf("HTTP/%d.%d %d %s\r\n", res.ProtoMajor, res.ProtoMinor, res.StatusCode, res.Status))
+	for key, values := range res.Header {
+		for _, value := range values {
+			if _, err = f.WriteString(fmt.Sprintf("%s: %s\r\n", key, value)); err != nil {
+				return
+			}
+		}
+	}
+	if _, err = f.WriteString("\r\n"); err != nil {
+		return
+	}
+	_, err = f.Write(hp.body)
+	return
+}
+
+func (hp *HTTPPath) ParseTitle() error {
+	if hp.ContentType != "text/html" {
+		return nil // don't show an error because of content type
+	}
+
+	doc, err := html.Parse(bytes.NewReader(hp.body))
+	if err != nil {
+		return err
+	}
+
+	hp.Title = parseTitle(doc)
+	return nil
+}
+
+func (hp *HTTPPath) Wappalyze(res *http.Response) error {
+	if hp.ContentType != "text/html" {
+		return nil
+	}
+
+	for fingerprint := range wappalyzerClient.Fingerprint(res.Header, hp.body) {
+		hp.AddTech(fingerprint)
 	}
 
 	return nil
