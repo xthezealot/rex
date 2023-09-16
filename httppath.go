@@ -79,11 +79,16 @@ type HTTPPath struct {
 }
 
 func (hp *HTTPPath) StoragePath() string {
-	return filepath.Join(currentDir, "http", hp.Port.Target.Host, strconv.Itoa(hp.Port.Number), sanitizeFilepath(hp.Path), "index.http")
+	path := filepath.Clean(hp.Path) // remove ".." path traversal
+	return filepath.Join(currentDir, "http", hp.Port.Target.Host, strconv.Itoa(hp.Port.Number), path, "index.http")
 }
 
 func (hp *HTTPPath) URL() string {
-	return hp.Port.URL() + "/" + hp.Path
+	if !strings.HasPrefix(hp.Path, "/") {
+		hp.Path = "/" + hp.Path
+	}
+
+	return hp.Port.URL() + hp.Path
 }
 
 func (hp *HTTPPath) AddTech(s string) {
@@ -137,9 +142,11 @@ func (hp *HTTPPath) Hunt() error {
 		return errIrrelevantPath
 	}
 
-	// skip if redirected to a "not found"-like page, without using status 404
-	if res.Request.URL.Path != hp.Path &&
-		(res.Request.URL.Path == "/" || strings.Contains(res.Request.URL.Path, "404") || strings.Contains(res.Request.URL.Path, "found")) {
+	// keep final path (after redirections) and urlencode for storage
+	hp.Path = encodePath(res.Request.URL.Path)
+
+	// ignore path if already known
+	if _, ok := hp.Port.Paths[hp.Path]; ok {
 		return errIrrelevantPath
 	}
 
@@ -149,7 +156,7 @@ func (hp *HTTPPath) Hunt() error {
 		return errIrrelevantPath
 	}
 
-	// ok until there, store response
+	// ok until there, keep body in memory
 	if hp.body, err = io.ReadAll(res.Body); err != nil {
 		return err
 	}

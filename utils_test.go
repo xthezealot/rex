@@ -38,3 +38,24 @@ func TestExtractHosts(t *testing.T) {
 		}
 	}
 }
+
+func TestEncodePath(t *testing.T) {
+	cases := map[string]string{
+		"/":                   "/",
+		"//":                  "//",
+		"/!":                  "/%21",
+		"/!/":                 "/%21/",
+		"/!/â":                "/%21/%C3%A2",
+		"parent/sub/../file":  "/parent/sub/../file",
+		"/parent/sub/../file": "/parent/sub/../file",
+		"/parent/../../file":  "/parent/../../file",
+		"/../etc/passwd\x00":  "/../etc/passwd%00",
+	}
+
+	for c, want := range cases {
+		got := encodePath(c)
+		if got != want {
+			t.Fatalf("%q: got %v, want %v", c, got, want)
+		}
+	}
+}

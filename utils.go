@@ -90,18 +90,17 @@ func isIP(s string) bool {
 	return net.ParseIP(s) != nil
 }
 
-func sanitizeFilepath(fp string) string {
-	disallowedChars := []string{"..", "\x00", " ", "*", "?", "[", "]", "`", "$", "\"", "'", ":", "\\", "<", ">", "|", "~", "%"}
-	for _, c := range disallowedChars {
-		fp = strings.ReplaceAll(fp, c, "_")
+func encodePath(path string) string {
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
 	}
 
-	maxLength := 255
-	if len(fp) > maxLength {
-		fp = fp[:maxLength]
+	parts := strings.Split(path, "/")
+	for i, part := range parts {
+		parts[i] = url.PathEscape(part)
 	}
 
-	return fp
+	return strings.Join(parts, "/")
 }
 
 func bToMb(b uint64) uint64 {
