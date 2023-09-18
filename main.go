@@ -22,7 +22,7 @@ var (
 
 	flagSubdomains = flag.Bool("d", false, "hunt for subdomains")
 	flagScan       = flag.Bool("s", false, "run vuln scanners during hunt")
-	flagMaxConn    = flag.Int("c", 150, "maximum connections across all targets")
+	flagMaxConn    = flag.Int("c", 150, "maximum parallel connections across all targets")
 	flagVerbose    = flag.Bool("v", false, "verbose")
 
 	wappalyzerClient *wappalyzer.Wappalyze

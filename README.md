@@ -50,3 +50,34 @@ Rex also depends on these external commands:
 5. 50% of the job is done.  
    Now, move onto the 50% manual work to find P1 and P2 vulns.  
    You can start by analysing HTTP responses saved in the `http` directory.
+
+# Complementary tools
+
+Since Rex doesn't include every conceivable scanner, use these tools for a more thorough check:
+
+```sh
+# 40x bypass
+# github.com/lobuhi/byp4xx
+byp4xx <URL>
+
+# CORS
+./corsy.py -u <URL>
+
+# Open redirect
+./oralyzer.py -u <URL>
+
+# Prototype pollution
+ppfuzz -l <URLS_FILE>
+
+# SQL injection
+./sqlmap.py -u <URL>
+ghauri -u <URL>
+
+# SSL
+# github.com/drwetter/testssl.sh
+./testssl.sh <DOMAIN>
+
+# Cache poisoning
+# github.com/hackmanit/web-cache-vulnerability-scanner
+wcvs -u <URL>
+```

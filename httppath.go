@@ -189,6 +189,8 @@ func (hp *HTTPPath) Hunt() error {
 
 	// todo: if path is /robots.txt, parse file content and add paths to loop
 
+	// todo: try 40x bypass (see github.com/lobuhi/byp4xx)
+
 	// run scanners if status is promising
 	if *flagScan && hp.Status <= 299 {
 		if err = hp.ScanXSS(); *flagVerbose && err != nil {
@@ -200,8 +202,9 @@ func (hp *HTTPPath) Hunt() error {
 		// todo: scan for prototype pollution (see github.com/dwisiswant0/ppfuzz)
 		// todo: scan for sqli
 		// todo: scan for ssrf
-		// todo: scan for ssti according to tech detected
+		// todo: scan for ssti according to detected tech
 		// todo: scan for secrets in response body
+		// todo: scan for cache poisoning (see github.com/hackmanit/web-cache-vulnerability-scanner)
 		// todo: nuclei tech-adapted scan
 	}
 
