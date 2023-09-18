@@ -27,6 +27,16 @@ func (target *Target) Hunt() {
 			Name:   portName,
 		}
 
+		// if not an ip, check that host can be resolved before pursuing
+		if !isIP(target.Host) {
+			if _, err := net.LookupHost(target.Host); err != nil {
+				if *flagVerbose {
+					log.Printf("%s cannot be resolved", target.Host)
+				}
+				return
+			}
+		}
+
 		globalWG.Add(1)
 		go func() {
 			defer globalWG.Done()
@@ -77,6 +87,14 @@ func (target *Target) HuntSubdomains() {
 				continue
 			}
 
+			// check that host can be resolved before pursuing
+			if _, err := net.LookupHost(target.Host); err != nil {
+				if *flagVerbose {
+					log.Printf("found %s but cannot be resolved", subtarget.Host)
+				}
+				return
+			}
+
 			log.Printf("new target: %s", subtarget.Host)
 
 			globalWG.Add(1)
@@ -89,4 +107,6 @@ func (target *Target) HuntSubdomains() {
 			}()
 		}
 	}
+
+	// todo: brutefoce subdomains from wordlist (and check that host can be resolved before pursuing)
 }

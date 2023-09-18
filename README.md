@@ -56,6 +56,10 @@ Rex also depends on these external commands:
 Since Rex doesn't include every conceivable scanner, use these tools for a more thorough check:
 
 ```sh
+# S3 recon
+# github.com/sa7mon/s3scanner
+s3scanner -bucket -enumerate -file <BUCKET_LIST_FILE>
+
 # 40x bypass
 # github.com/lobuhi/byp4xx
 byp4xx <URL>
@@ -67,7 +71,7 @@ byp4xx <URL>
 ./oralyzer.py -u <URL>
 
 # Prototype pollution
-ppfuzz -l <URLS_FILE>
+ppfuzz -l <URL_LIST_FILE>
 
 # SQL injection
 ./sqlmap.py -u <URL>
