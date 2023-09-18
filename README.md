@@ -60,21 +60,42 @@ Since Rex doesn't include every conceivable scanner, use these tools for a more 
 # github.com/sa7mon/s3scanner
 s3scanner -bucket -enumerate -file <BUCKET_LIST_FILE>
 
+# Google dorks search
+# github.com/six2dez/dorks_hunter
+./dorks_hunter.py -d <DOMAIN>
+
+# GitHub dorks search
+# github.com/obheda12/gitdorker
+# github.com/damit5/gitdorks_go
+
+# GitHub leaks
+# github.com/gitleaks/gitleaks
+# github.com/trufflesecurity/trufflehog)
+
+# Generic secrets
+# github.com/securing/dumpsterdiver
+./DumpsterDiver.py -p <FOLDER>
+
 # 40x bypass
 # github.com/lobuhi/byp4xx
 byp4xx <URL>
 
 # CORS
+# github.com/s0md3v/corsy
 ./corsy.py -u <URL>
 
 # Open redirect
+# github.com/r0075h3ll/oralyzer
 ./oralyzer.py -u <URL>
 
 # Prototype pollution
+# github.com/dwisiswant0/ppfuzz
 ppfuzz -l <URL_LIST_FILE>
 
 # SQL injection
+# github.com/sqlmapproject/sqlmap
 ./sqlmap.py -u <URL>
+# github.com/r0oth3x49/ghauri
 ghauri -u <URL>
 
 # SSL

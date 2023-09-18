@@ -168,5 +168,7 @@ func (p *Port) Hunt() error {
 
 	}
 
+	// todo: bruteforce default credentials (see github.com/x90skysn3k/brutespray)
+
 	return nil
 }

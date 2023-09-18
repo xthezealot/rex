@@ -197,7 +197,8 @@ func (hp *HTTPPath) Hunt() error {
 			log.Printf("error on xss check for  %s: %v", hp.URL(), err)
 		}
 
-		// todo: scan for cors
+		// todo: scan for secrets (see github.com/securing/dumpsterdiver)
+		// todo: scan for cors (see github.com/s0md3v/corsy)
 		// todo: scan for open redirection (see github.com/r0075h3ll/oralyzer)
 		// todo: scan for prototype pollution (see github.com/dwisiswant0/ppfuzz)
 		// todo: scan for sqli
@@ -205,6 +206,7 @@ func (hp *HTTPPath) Hunt() error {
 		// todo: scan for ssti according to detected tech
 		// todo: scan for secrets in response body
 		// todo: scan for cache poisoning (see github.com/hackmanit/web-cache-vulnerability-scanner)
+		// todo: cms-adapted scan (see github.com/tuhinshubhra/cmseek)
 		// todo: nuclei tech-adapted scan
 	}
 

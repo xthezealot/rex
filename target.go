@@ -61,6 +61,9 @@ func (target *Target) Hunt() {
 	}
 
 	// todo: nuclei generic scan
+	// todo: google dorks search (see github.com/six2dez/dorks_hunter)
+	// todo: github dorks search (see github.com/obheda12/gitdorker & github.com/damit5/gitdorks_go)
+	// todo: github leaks (see github.com/gitleaks/gitleaks & github.com/trufflesecurity/trufflehog)
 }
 
 func (target *Target) HuntSubdomains() {
